@@ -13,7 +13,7 @@ Capacity limits: regular nonsymlink file at most64MiB, about5million SQLite VM i
 
 Deployment requires separately verified image layout, running identity and a read-only mount of a dedicated ledger directory. Do not weaken private data permissions or change the reader identity without approval. The extension adds no service, port, credential or collection schedule. Do not publish actual deployment configuration or private acceptance data. Keep the original reader/image for rollback; the bridge does not modify the database.
 
-Synthetic verification:80 tests including missing/wrong/duplicate authentication, write methods, original account route, notes, parameter/ID/pagination limits, file/row/concurrency limits, WAL refusal, schema/missing/locked/corrupt databases, DDL/ATTACH refusal, unchanged hash/mtime, malformed requests and sanitized internal errors. Python compileall, JavaScript syntax and existing browser replay checks also pass locally. No real-server deployment or real-data publication is claimed.
+Synthetic verification:84 tests including missing/wrong/duplicate authentication, write methods, original account route, notes, parameter/ID/pagination limits, file/row/concurrency limits, WAL refusal, schema/missing/locked/corrupt databases, DDL/ATTACH refusal, unchanged hash/mtime, malformed requests and sanitized internal errors. Python compileall, JavaScript syntax and existing browser replay checks also pass locally. No real-server deployment or real-data publication is claimed.
 
 
 ## Optional manual installer
@@ -26,3 +26,9 @@ Build failure leaves the current service/default configuration unchanged. Recrea
 
 
 When Docker access requires sudo, authenticate with `sudo -v` in the terminal, then invoke the installer as the ordinary approved owner with `--sudo-docker` (including rollback). Only Docker child commands become `sudo -n docker ...`; Python file operations and database reads remain unprivileged. No sudo password is read, stored or forwarded by the script. A missing/expired sudo ticket fails closed with a sanitized error. Do not run the entire installer under sudo.
+
+## Read-only diagnostic
+
+`python3 -B tools/diagnose-reader-bridge.py` accepts the same required reader/ledger directory, service, UID/GID and expected-image values as installation, plus optional --sudo-docker. It reports only recovery-directory existence and fixed preflight check/error codes. It calls preflight directly, never install/rollback, and additionally allowlists only Docker config/ps/inspect/info reads. No state, backup, configuration or container is changed; bytecode writing is disabled. sudo uses -n and never prompts. Failure is diagnostic evidence, not a request to repeat installation.
+
+The diagnostic is covered by synthetic success/failure snapshots proving unchanged file hashes/mtime, sanitized command errors and explicit rejection of mutating Docker commands. Total synthetic tests:84.

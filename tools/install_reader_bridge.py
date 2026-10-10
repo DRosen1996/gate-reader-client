@@ -15,6 +15,11 @@ import time
 BASE_SHA = 'd3623009ee66c3d3f6b3f32118486af986228c987b8c39ba1355cdd224d31414'
 SOURCE = Path(__file__).resolve().parents[1]
 SUDO_DOCKER = False
+STAGE = "ARGUMENTS"
+
+def stage(name):
+    global STAGE
+    STAGE = name
 
 
 def run(args):
@@ -34,6 +39,7 @@ def private_dir(path, uid):
 
 
 def preflight(reader, ledger, service, uid, gid, image):
+    stage("PREFLIGHT_FILES_PERMISSIONS")
     if os.getuid() != uid or uid == 0 or gid == 0:
         raise ValueError('Run as approved non-root owner')
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', image):
@@ -58,6 +64,7 @@ def preflight(reader, ledger, service, uid, gid, image):
     if ledger.stat().st_gid != gid:
         raise ValueError('Ledger group mismatch')
     # Use the bounded read-only adapter without inspecting any account output.
+    stage("PREFLIGHT_LEDGER")
     from review import readonly
     original = readonly.DATABASE
     try:
@@ -65,6 +72,7 @@ def preflight(reader, ledger, service, uid, gid, image):
         readonly.query_review('/review-summary?limit=1')
     finally:
         readonly.DATABASE = original
+    stage("PREFLIGHT_SOURCE")
     if hashlib.sha256((reader / 'app.py').read_bytes()).hexdigest() != BASE_SHA:
         raise ValueError('Reader source mismatch')
     dockerfile = (reader / 'Dockerfile').read_text()
@@ -76,6 +84,7 @@ def preflight(reader, ledger, service, uid, gid, image):
             raise ValueError('Dockerfile mismatch')
     if sum(line.startswith('COPY ') for line in instructions) != 1:
         raise ValueError('Unexpected COPY')
+    stage("PREFLIGHT_DOCKER_CONFIG")
     cfg = json.loads(run(['docker', 'compose', '-f', str(reader/'compose.yaml'), 'config', '--format', 'json']))
     s = cfg['services'][service]
     b = s['build']
@@ -90,6 +99,7 @@ def preflight(reader, ledger, service, uid, gid, image):
         raise ValueError('Port mismatch')
     if 'no-new-privileges:true' not in s.get('security_opt', []):
         raise ValueError('Missing no-new-privileges')
+    stage("PREFLIGHT_CONTAINER")
     cid = run(['docker','compose','-f',str(reader/'compose.yaml'),'ps','-q',service])
     if not re.fullmatch(r'[a-f0-9]{12,64}', cid):
         raise ValueError('Expected one running container')
@@ -97,6 +107,7 @@ def preflight(reader, ledger, service, uid, gid, image):
     current = json.loads(run(['docker','inspect','--format',fmt,cid]))
     if current['image'] != image or current['user'] != '65534:65534' or any(current[k] for k in ('mounts','privileged','userns','groups','caps','pid')) or 'no-new-privileges:true' not in current['security']:
         raise ValueError('Running container mismatch')
+    stage("PREFLIGHT_DOCKER_INFO")
     options = json.loads(run(['docker','info','--format','{{json .SecurityOptions}}']))
     if any('rootless' in x or 'userns' in x for x in options):
         raise ValueError('User mapping unsupported')
