@@ -103,6 +103,41 @@ class InstallerTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): install.install(self.args)
         self.assertTrue((self.reader.parent/'.reader-bridge-install'/'ROLLED_BACK').exists())
 
+    def test_preserve_existing_env_and_healthcheck(self):
+        original = ('FROM python:3.12-slim\r\nWORKDIR /app\r\n'
+                    'ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1\r\n'
+                    'COPY app.py /app/app.py\r\nUSER 65534:65534\r\n'
+                    'EXPOSE 8787\r\nHEALTHCHECK --interval=30s CMD python -c "print(1)"\r\n'
+                    'CMD ["python", "app.py"]\r\n').encode()
+        (self.reader/'Dockerfile').write_bytes(original)
+        state=install.install(self.args)
+        staged=(state/'build'/'Dockerfile').read_bytes()
+        self.assertEqual(staged, original+b'\nCOPY review/__init__.py review/ledger.py review/readonly.py /app/review/\n')
+        self.assertEqual((self.reader/'Dockerfile').read_bytes(), original)
+        self.assertEqual((state/'backup'/'Dockerfile').read_bytes(),original)
+
+    def test_continuations_are_arguments_not_new_instructions(self):
+        slash=chr(92)
+        source=('FROM python:3.12-slim\nWORKDIR /app\n'
+                'ENV PYTHONDONTWRITEBYTECODE=1 '+slash+'\n'
+                '# synthetic comment\n PYTHONUNBUFFERED=1\n'
+                'COPY app.py /app/app.py\nUSER 65534:65534\nEXPOSE 8787\n'
+                'HEALTHCHECK --interval=30s '+slash+'\n CMD python -c "print(1)"\n'
+                'CMD ["python", "app.py"]\n')
+        parsed=install.dockerfile_instructions(source)
+        self.assertEqual([x.split()[0] for x in parsed],['FROM','WORKDIR','ENV','COPY','USER','EXPOSE','HEALTHCHECK','CMD'])
+        (self.reader/'Dockerfile').write_text(source)
+        self.preflight()
+        self.assertFalse((self.reader.parent/'.reader-bridge-install').exists())
+
+    def test_unapproved_instructions_and_layout_fail_closed(self):
+        source=(self.reader/'Dockerfile').read_text()
+        for altered in (source+'RUN SYNTHETIC_SECRET\n', source+'ENV SYNTHETIC_SECRET=value\n',
+                        source+'HEALTHCHECK NONE\n', '# escape=`\n'+source,
+                        '# syntax=unapproved/frontend\n'+source, source+chr(92)):
+            with self.assertRaises(ValueError) as error: install.dockerfile_instructions(altered)
+            self.assertNotIn('SYNTHETIC_SECRET',str(error.exception))
+
     def test_changed_base_blocks_rollback_before_override_removal(self):
         state=install.install(self.args)
         (self.reader/'compose.yaml').write_text('changed base')

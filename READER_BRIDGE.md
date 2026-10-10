@@ -13,7 +13,7 @@ Capacity limits: regular nonsymlink file at most64MiB, about5million SQLite VM i
 
 Deployment requires separately verified image layout, running identity and a read-only mount of a dedicated ledger directory. Do not weaken private data permissions or change the reader identity without approval. The extension adds no service, port, credential or collection schedule. Do not publish actual deployment configuration or private acceptance data. Keep the original reader/image for rollback; the bridge does not modify the database.
 
-Synthetic verification:84 tests including missing/wrong/duplicate authentication, write methods, original account route, notes, parameter/ID/pagination limits, file/row/concurrency limits, WAL refusal, schema/missing/locked/corrupt databases, DDL/ATTACH refusal, unchanged hash/mtime, malformed requests and sanitized internal errors. Python compileall, JavaScript syntax and existing browser replay checks also pass locally. No real-server deployment or real-data publication is claimed.
+Synthetic verification:87 tests including missing/wrong/duplicate authentication, write methods, original account route, notes, parameter/ID/pagination limits, file/row/concurrency limits, WAL refusal, schema/missing/locked/corrupt databases, DDL/ATTACH refusal, unchanged hash/mtime, malformed requests and sanitized internal errors. Python compileall, JavaScript syntax and existing browser replay checks also pass locally. No real-server deployment or real-data publication is claimed.
 
 
 ## Optional manual installer
@@ -31,4 +31,7 @@ When Docker access requires sudo, authenticate with `sudo -v` in the terminal, t
 
 `python3 -B tools/diagnose-reader-bridge.py` accepts the same required reader/ledger directory, service, UID/GID and expected-image values as installation, plus optional --sudo-docker. It reports only recovery-directory existence and fixed preflight check/error codes. It calls preflight directly, never install/rollback, and additionally allowlists only Docker config/ps/inspect/info reads. No state, backup, configuration or container is changed; bytecode writing is disabled. sudo uses -n and never prompts. Failure is diagnostic evidence, not a request to repeat installation.
 
-The diagnostic is covered by synthetic success/failure snapshots proving unchanged file hashes/mtime, sanitized command errors and explicit rejection of mutating Docker commands. Total synthetic tests:84.
+The diagnostic is covered by synthetic success/failure snapshots proving unchanged file hashes/mtime, sanitized command errors and explicit rejection of mutating Docker commands. Total synthetic tests:87.
+
+
+The installer preserves the local original Dockerfile byte-for-byte as the staged prefix and only appends the required module COPY. Its validated single-stage layout now supports the existing optional ENV, EXPOSE and HEALTHCHECK instructions in their established positions, each at most once. Values are never read back to public artifacts or logs, and cannot be supplied as new installer arguments. Default single-backslash continuations (including comment lines) are parsed as one logical instruction. Custom syntax/escape directives, unsupported instructions, duplicate/reordered layout and dangling or repeated trailing escape characters fail closed with fixed errors. Synthetic fixtures cover ENV/HEALTHCHECK preservation, CRLF bytes and multiline continuations. Existing ENV remains in the rebuilt image as in the original image; it is not a new credential store.

@@ -38,6 +38,46 @@ def private_dir(path, uid):
         raise ValueError('Private directory permissions mismatch')
 
 
+def dockerfile_instructions(text):
+    """Only the existing single-stage layout, with default escape continuations."""
+    logical, parts = [], []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith('#'):
+            if re.match(r'#\s*syntax\s*=', line, re.I):
+                raise ValueError('Dockerfile mismatch')
+            if re.match(r'#\s*escape\s*=', line, re.I) and line.split('=', 1)[1].strip() != chr(92):
+                raise ValueError('Dockerfile mismatch')
+            continue
+        if not line:
+            continue
+        slash_count = len(line) - len(line.rstrip(chr(92)))
+        if slash_count > 1:
+            raise ValueError('Dockerfile mismatch')
+        continued = slash_count == 1
+        parts.append(line[:-1].rstrip() if continued else line)
+        if continued:
+            continue
+        joined = ' '.join(parts)
+        keyword, *body = joined.split(None, 1)
+        if not body:
+            raise ValueError('Dockerfile mismatch')
+        logical.append(keyword.upper() + ' ' + body[0])
+        parts = []
+    if parts:
+        raise ValueError('Dockerfile mismatch')
+    names = [line.split(None, 1)[0] for line in logical]
+    allowed = {'FROM', 'WORKDIR', 'ENV', 'COPY', 'USER', 'EXPOSE', 'HEALTHCHECK', 'CMD'}
+    if any(name not in allowed for name in names):
+        raise ValueError('Unrecognized Dockerfile instruction')
+    # Optional ENV/EXPOSE/HEALTHCHECK are preserved existing instructions,
+    # not supplied by installer arguments or synthesized into the Dockerfile.
+    expected = ['FROM', 'WORKDIR'] + (['ENV'] if 'ENV' in names else []) + ['COPY', 'USER'] + (['EXPOSE'] if 'EXPOSE' in names else []) + (['HEALTHCHECK'] if 'HEALTHCHECK' in names else []) + ['CMD']
+    if names != expected:
+        raise ValueError('Dockerfile mismatch')
+    return logical
+
+
 def preflight(reader, ledger, service, uid, gid, image):
     stage("PREFLIGHT_FILES_PERMISSIONS")
     if os.getuid() != uid or uid == 0 or gid == 0:
@@ -75,10 +115,8 @@ def preflight(reader, ledger, service, uid, gid, image):
     stage("PREFLIGHT_SOURCE")
     if hashlib.sha256((reader / 'app.py').read_bytes()).hexdigest() != BASE_SHA:
         raise ValueError('Reader source mismatch')
-    dockerfile = (reader / 'Dockerfile').read_text()
-    instructions = [line.strip() for line in dockerfile.splitlines() if line.strip() and not line.lstrip().startswith('#')]
-    if any(line.split()[0].upper() not in {'FROM', 'WORKDIR', 'COPY', 'USER', 'CMD', 'EXPOSE'} for line in instructions):
-        raise ValueError('Unrecognized Dockerfile instruction')
+    dockerfile = (reader / 'Dockerfile').read_bytes().decode('utf-8')
+    instructions = dockerfile_instructions(dockerfile)
     for required in ('FROM python:3.12-slim', 'WORKDIR /app', 'COPY app.py /app/app.py', 'USER 65534:65534'):
         if instructions.count(required) != 1:
             raise ValueError('Dockerfile mismatch')
@@ -169,7 +207,7 @@ def install(args):
     for path in (build/'app.py', *list((build/'review').iterdir())):
         path.chmod(0o644)
     (build/'review').chmod(0o755)
-    (build/'Dockerfile').write_text(dockerfile + '\nCOPY review/__init__.py review/ledger.py review/readonly.py /app/review/\n')
+    (build/'Dockerfile').write_text(dockerfile + '\nCOPY review/__init__.py review/ledger.py review/readonly.py /app/review/\n', encoding='utf-8')
     image_digest = hashlib.sha256(b''.join((build/rel).read_bytes() for rel in ('app.py','review/__init__.py','review/ledger.py','review/readonly.py'))).hexdigest()[:16]
     override_data = json.dumps({'services': {args.service: {
         'image': 'review-reader-bridge:' + image_digest,
