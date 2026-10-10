@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from playwright.sync_api import sync_playwright
@@ -14,10 +15,10 @@ args=parser.parse_args()
 
 with tempfile.TemporaryDirectory() as private:
     db=str(Path(private)/'demo.sqlite')
-    subprocess.run(['python','-m','review','--db',db,'demo'],check=True)
+    subprocess.run([sys.executable,'-m','review','--db',db,'demo'],check=True)
     with socket.socket() as sock:
         sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
-    process=subprocess.Popen(['python','-m','review','--db',db,'serve','--port',str(port)],stdout=subprocess.DEVNULL)
+    process=subprocess.Popen([sys.executable,'-m','review','--db',db,'serve','--port',str(port)],stdout=subprocess.DEVNULL)
     try:
         with sync_playwright() as p:
             browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM','/usr/bin/chromium'),headless=True,args=['--no-sandbox'])

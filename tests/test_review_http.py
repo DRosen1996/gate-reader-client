@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -14,11 +15,11 @@ class HttpTests(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.db = str(Path(cls.tmp.name) / 'demo.db')
-        subprocess.run(['python', '-m', 'review', '--db', cls.db, 'demo'], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run([sys.executable, '-m', 'review', '--db', cls.db, 'demo'], check=True, stdout=subprocess.DEVNULL)
         with socket.socket() as sock:
             sock.bind(('127.0.0.1', 0))
             cls.port = sock.getsockname()[1]
-        cls.process = subprocess.Popen(['python', '-m', 'review', '--db', cls.db, 'serve', '--port', str(cls.port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        cls.process = subprocess.Popen([sys.executable, '-m', 'review', '--db', cls.db, 'serve', '--port', str(cls.port)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for _ in range(50):
             try:
                 with socket.create_connection(('127.0.0.1', cls.port), timeout=.1):
