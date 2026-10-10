@@ -11,7 +11,7 @@ import urllib.request
 BASE_URL = "https://gate-reader.gatelens.site"
 ENDPOINTS = frozenset({"health", "account", "positions", "orders", "order-history",
     "trades", "closed-positions", "position-history", "account-book",
-    "trigger-orders", "snapshot"})
+    "trigger-orders", "snapshot", "review-summary", "review-trade"})
 HISTORY = frozenset({"order-history", "trades", "closed-positions",
     "position-history", "account-book"})
 MAX_WINDOW = 7 * 24 * 60 * 60
@@ -45,7 +45,18 @@ class Client:
         if endpoint not in ENDPOINTS:
             raise ReaderError("Unsupported endpoint")
         allowed = set()
-        if endpoint not in {"health", "account", "snapshot"}:
+        if endpoint in {"review-summary", "review-trade"}:
+            import re
+            if set(params) - ({"limit", "offset", "id"} if endpoint == "review-trade" else {"limit", "offset"}):
+                raise ReaderError("Invalid review parameter")
+            if endpoint == "review-trade" and (not isinstance(params.get("id"), str) or not re.fullmatch(r"cycle:[a-f0-9]{64}", params["id"])):
+                raise ReaderError("Invalid review parameter")
+            if "offset" in params and _integer(params["offset"], "offset") > 10000:
+                raise ReaderError("Invalid review parameter")
+            allowed.update({"limit", "offset"})
+            if endpoint == "review-trade":
+                allowed.add("id")
+        if endpoint not in {"health", "account", "snapshot", "review-summary", "review-trade"}:
             allowed.update({"limit", "offset", "contract"})
         if endpoint in HISTORY:
             allowed.update({"from", "to"})
@@ -108,7 +119,7 @@ class Client:
 
     def pages(self, endpoint, **params):
         """Yield original envelopes; terminate only on explicit null next_offset."""
-        if endpoint in {"health", "account", "snapshot"}:
+        if endpoint in {"health", "account", "snapshot", "review-summary", "review-trade"}:
             raise ReaderError("Endpoint does not support pagination")
         params.setdefault("limit", 100)
         params.setdefault("offset", 0)

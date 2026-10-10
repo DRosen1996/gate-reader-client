@@ -9,6 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description="Read-only Gate reader; output is account-sensitive")
     parser.add_argument("endpoint", choices=sorted(ENDPOINTS))
     parser.add_argument("--contract")
+    parser.add_argument("--id", dest="cycle_id")
     parser.add_argument("--limit", type=int)
     parser.add_argument("--offset", type=int)
     parser.add_argument("--from", dest="start", type=int)
@@ -18,7 +19,7 @@ def main():
     parser.add_argument("--history", action="store_true", help="Read all pages/windows of explicit historical range")
     args = parser.parse_args()
     params = {k: v for k, v in {"contract": args.contract, "limit": args.limit,
-        "offset": args.offset, "from": args.start, "to": args.end}.items() if v is not None}
+        "offset": args.offset, "id": args.cycle_id, "from": args.start, "to": args.end}.items() if v is not None}
     if args.holding is not None:
         params["holding"] = args.holding == "true"
     try:

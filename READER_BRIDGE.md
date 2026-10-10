@@ -1,0 +1,16 @@
+# Authenticated read-only ledger bridge
+
+This optional reader extension exposes two GET endpoints after the existing Bearer check. It does not expose the review UI, note writes, SQL, arbitrary paths, or a database download. Existing Gate routes and authentication remain unchanged.
+
+- `/review-summary?limit=20&offset=0` returns server-ledger provenance, sync cutoffs, observed time, completeness, cash categories, cycles, gaps, unallocated items and orphan notes.
+- `/review-trade?id=cycle:<64 lowercase hex characters>&limit=20&offset=0` returns a stable cycle with versioned notes, fills, fees, order observations and flows.
+- Each list has independent items/total/next_offset; the requested offset applies to each list. Client.query and CLI --id support these routes. Gate Client.pages does not apply to this nested pagination.
+- Unknown/duplicate parameters are rejected. limit is 1–100 and offset 0–10000. Responses are no-store and limited to512KiB; a too-large single record is rejected without silently truncating it. Errors contain only fixed messages.
+
+The server uses a fixed container path `/review-data/ledger.sqlite`, SQLite mode=ro, query_only, trusted_schema=OFF and one read transaction per request. It accepts only schema2/DELETE and never calls the writable Ledger initializer or migrations. DDL, ATTACH and writes are denied. No immutable/nolock flags are used.
+
+Capacity limits: regular nonsymlink file at most64MiB, about5million SQLite VM instructions, at most2 concurrent projections per process; source row caps observations5000/evidence10000/sightings20000/notes2000/ranges2000/gaps2000/cycle_aliases5000. Exceeding a limit fails closed, with no partial success response. These limits also bound Python projection work; SQL instruction limits alone do not.
+
+Deployment requires separately verified image layout, running identity and a read-only mount of a dedicated ledger directory. Do not weaken private data permissions or change the reader identity without approval. The extension adds no service, port, credential or collection schedule. Do not publish actual deployment configuration or private acceptance data. Keep the original reader/image for rollback; the bridge does not modify the database.
+
+Synthetic verification:70 tests including missing/wrong/duplicate authentication, write methods, original account route, notes, parameter/ID/pagination limits, file/row/concurrency limits, WAL refusal, schema/missing/locked/corrupt databases, DDL/ATTACH refusal, unchanged hash/mtime, malformed requests and sanitized internal errors. Python compileall, JavaScript syntax and existing browser replay checks also pass locally. No real-server deployment or real-data publication is claimed.
