@@ -3,3 +3,9 @@ __pycache__/
 .env
 .env.*
 *.log
+*.sqlite*
+*.db
+*.db-*
+*.jsonl
+*.backup
+node_modules/
