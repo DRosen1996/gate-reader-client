@@ -157,7 +157,9 @@ def install(args):
         path.chmod(0o644)
     (build/'review').chmod(0o755)
     (build/'Dockerfile').write_text(dockerfile + '\nCOPY review/__init__.py review/ledger.py review/readonly.py /app/review/\n')
+    image_digest = hashlib.sha256(b''.join((build/rel).read_bytes() for rel in ('app.py','review/__init__.py','review/ledger.py','review/readonly.py'))).hexdigest()[:16]
     override_data = json.dumps({'services': {args.service: {
+        'image': 'review-reader-bridge:' + image_digest,
         'user': str(args.uid)+':'+str(args.gid),
         'build': {'context': str(build), 'dockerfile': 'Dockerfile'},
         'volumes': [{'type':'bind','source':str(ledger),'target':'/review-data','read_only':True}]

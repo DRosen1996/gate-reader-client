@@ -79,6 +79,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual(override['user'],str(self.args.uid)+':'+str(self.args.gid))
         self.assertTrue(override['volumes'][0]['read_only'])
         self.assertNotIn('environment',override);self.assertNotIn('ports',override)
+        self.assertTrue(override['image'].startswith('review-reader-bridge:'))
         context=Path(override['build']['context'])
         self.assertEqual(sorted(p.name for p in context.iterdir()),['Dockerfile','app.py','review'])
         self.assertIn('COPY review/__init__.py review/ledger.py review/readonly.py /app/review/',(context/'Dockerfile').read_text())
