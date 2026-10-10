@@ -14,10 +14,12 @@ import time
 
 BASE_SHA = 'd3623009ee66c3d3f6b3f32118486af986228c987b8c39ba1355cdd224d31414'
 SOURCE = Path(__file__).resolve().parents[1]
+SUDO_DOCKER = False
 
 
 def run(args):
-    p = subprocess.run(args, capture_output=True, text=True)
+    command = ['sudo', '-n', *args] if SUDO_DOCKER and args and args[0] == 'docker' else args
+    p = subprocess.run(command, capture_output=True, text=True)
     if p.returncode:
         raise RuntimeError('Command failed; details hidden')
     return p.stdout.strip()
@@ -190,11 +192,14 @@ def install(args):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--rollback')
+    parser.add_argument('--sudo-docker', action='store_true', help='Only Docker children use sudo -n; first authenticate sudo in the terminal')
     parser.add_argument('--reader-dir'); parser.add_argument('--ledger-dir')
     parser.add_argument('--service', default='reader')
     parser.add_argument('--uid',type=int); parser.add_argument('--gid',type=int)
     parser.add_argument('--expected-image')
     args=parser.parse_args()
+    global SUDO_DOCKER
+    SUDO_DOCKER = args.sudo_docker
     try:
         if args.rollback:
             os.umask(0o077); rollback(Path(args.rollback)); print('Rollback PASS')

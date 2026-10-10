@@ -114,3 +114,22 @@ class InstallerTests(unittest.TestCase):
         (self.reader/'compose.override.yaml').write_text('changed')
         with self.assertRaises(ValueError):install.rollback(state)
         self.assertTrue((self.reader/'compose.override.yaml').exists())
+
+
+class DockerSudoTests(unittest.TestCase):
+    def test_sudo_wraps_only_docker_noninteractively(self):
+        from types import SimpleNamespace
+        with patch.object(install, 'SUDO_DOCKER', True), patch.object(install.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='ok')) as child:
+            self.assertEqual(install.run(['docker','compose','ps']), 'ok')
+            self.assertEqual(child.call_args.args[0], ['sudo','-n','docker','compose','ps'])
+            install.run(['other','command'])
+            self.assertEqual(child.call_args.args[0], ['other','command'])
+
+    def test_default_docker_and_sudo_failure_are_safe(self):
+        from types import SimpleNamespace
+        with patch.object(install, 'SUDO_DOCKER', False), patch.object(install.subprocess, 'run', return_value=SimpleNamespace(returncode=0, stdout='ok')) as child:
+            install.run(['docker','info'])
+            self.assertEqual(child.call_args.args[0], ['docker','info'])
+        with patch.object(install, 'SUDO_DOCKER', True), patch.object(install.subprocess, 'run', return_value=SimpleNamespace(returncode=1, stdout='SYNTHETIC_SECRET', stderr='SYNTHETIC_SECRET')):
+            with self.assertRaises(RuntimeError) as error: install.run(['docker','info'])
+            self.assertNotIn('SYNTHETIC_SECRET', str(error.exception))
