@@ -45,6 +45,14 @@ class HttpTests(unittest.TestCase):
     def view(self):
         return json.loads(self.request('GET', '/api/view')[2])
 
+    def test_note_during_sync_lock_returns_busy(self):
+        from review.write_lock import write_lock
+        cycle=self.view()['cycles'][0]['id']
+        body=json.dumps({'cycle':cycle,'kind':'review','body':'synthetic blocked note'})
+        headers={'Origin':f'http://127.0.0.1:{self.port}','Content-Type':'application/json'}
+        with write_lock(self.db):
+            self.assertEqual(self.request('POST','/api/notes',headers,body)[0],409)
+
     def test_host_origin_rejections_do_not_write(self):
         cycle = self.view()['cycles'][0]['id']
         before = len(self.view()['cycles'][0]['notes'])

@@ -82,7 +82,7 @@ class InstallerTests(unittest.TestCase):
         self.assertTrue(override['image'].startswith('review-reader-bridge:'))
         context=Path(override['build']['context'])
         self.assertEqual(sorted(p.name for p in context.iterdir()),['Dockerfile','app.py','review'])
-        self.assertIn('COPY review/__init__.py review/ledger.py review/readonly.py /app/review/',(context/'Dockerfile').read_text())
+        self.assertIn('COPY review/__init__.py review/ledger.py review/readonly.py review/write_lock.py review/verified_sync.py /app/review/',(context/'Dockerfile').read_text())
         with self.assertRaises(ValueError):install.install(self.args)
         install.rollback(state)
         self.assertFalse((self.reader/'compose.override.yaml').exists())
@@ -112,7 +112,7 @@ class InstallerTests(unittest.TestCase):
         (self.reader/'Dockerfile').write_bytes(original)
         state=install.install(self.args)
         staged=(state/'build'/'Dockerfile').read_bytes()
-        self.assertEqual(staged, original+b'\nCOPY review/__init__.py review/ledger.py review/readonly.py /app/review/\n')
+        self.assertEqual(staged, original+b'\nCOPY review/__init__.py review/ledger.py review/readonly.py review/write_lock.py review/verified_sync.py /app/review/\n')
         self.assertEqual((self.reader/'Dockerfile').read_bytes(), original)
         self.assertEqual((state/'backup'/'Dockerfile').read_bytes(),original)
 

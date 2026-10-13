@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from .ledger import Ledger, restore, verify_database
+from .write_lock import Busy
 
 
 def handler_for(ledger, port):
@@ -68,6 +69,8 @@ def handler_for(ledger, port):
                 cycle = next(c for c in ledger.view()['cycles'] if c['id'] == note['cycle'])
                 ledger.note(cycle['id'], note['kind'], note['body'], int(Decimal(str(cycle['opened']))))
                 self.send(201, b'{}')
+            except Busy:
+                self.send(409, b'{"error":"Ledger busy"}')
             except (ValueError, KeyError, StopIteration, TypeError, ArithmeticError, TimeoutError):
                 self.send(400, b'{"error":"Invalid note"}')
             except sqlite3.DatabaseError:
@@ -75,7 +78,7 @@ def handler_for(ledger, port):
     return Handler
 
 
-def main():
+def _main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--db', required=True)
     sub = parser.add_subparsers(dest='command', required=True)
@@ -147,6 +150,20 @@ def main():
                 server.serve_forever()
     finally:
         ledger.db.close()
+
+
+def main():
+    # Parse only the fixed CLI database option for locking; _main retains full
+    # argparse validation. Serving holds the lock only during initialization.
+    import sys
+    from .write_lock import write_lock
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument('--db', required=True)
+    args, rest = parser.parse_known_args()
+    if rest and rest[0] == 'serve':
+        return _main()
+    with write_lock(args.db):
+        return _main()
 
 
 if __name__ == '__main__':

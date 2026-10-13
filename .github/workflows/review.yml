@@ -1,9 +1,9 @@
 name: Review ledger checks
 on:
   push:
-    branches: [review-ledger-v1, review-readonly-bridge]
+    branches: [review-ledger-v1, review-readonly-bridge, review-chat-sync]
   pull_request:
-    branches: [main, review-ledger-v1]
+    branches: [main, review-ledger-v1, review-readonly-bridge]
 permissions:
   contents: read
 jobs:

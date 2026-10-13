@@ -214,7 +214,7 @@ class AuditRegressionTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 self.l.backup(target)
         self.assertEqual(target.read_bytes(), b'concurrent synthetic file')
-        self.assertEqual(set(Path(self.tmp.name).iterdir()), {self.path, target})
+        self.assertEqual(set(Path(self.tmp.name).iterdir()), {self.path, target, Path(str(self.path) + ".lock")})
 
     def test_restore_validates_captured_bytes_not_reopened_source(self):
         from unittest.mock import patch

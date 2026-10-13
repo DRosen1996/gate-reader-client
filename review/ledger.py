@@ -122,6 +122,11 @@ def coverage(ranges):
 
 class Ledger:
     def __init__(self, path):
+        from .write_lock import write_lock
+        with write_lock(private_path(path)):
+            self._initialize(path)
+
+    def _initialize(self, path):
         self.path = private_path(path)
         os.umask(0o077)
         try:
@@ -189,6 +194,11 @@ class Ledger:
             net[contract] = old + size
 
     def ingest(self, endpoint, page, context):
+        from .write_lock import write_lock
+        with write_lock(self.path):
+            return self._ingest(endpoint, page, context)
+
+    def _ingest(self, endpoint, page, context):
         body = encode(page)
         digest = hashlib.sha256(body.encode()).hexdigest()
         records = page.get('data', page) if endpoint == 'snapshot' else page['data']
@@ -261,6 +271,11 @@ class Ledger:
         return list(latest.values())
 
     def sync(self, client, endpoint, start, end):
+        from .write_lock import write_lock
+        with write_lock(self.path):
+            return self._sync(client, endpoint, start, end)
+
+    def _sync(self, client, endpoint, start, end):
         from gate_reader.client import MAX_WINDOW
         if endpoint not in HISTORICAL_ENDPOINTS or isinstance(start, bool) or isinstance(end, bool) or not isinstance(start, int) or not isinstance(end, int) or not 0 <= start <= end:
             raise ValueError('Invalid sync range')
@@ -283,6 +298,11 @@ class Ledger:
             cursor = stop
 
     def note(self, cycle, kind, body, effective):
+        from .write_lock import write_lock
+        with write_lock(self.path):
+            return self._note(cycle, kind, body, effective)
+
+    def _note(self, cycle, kind, body, effective):
         if kind not in ('plan', 'decision', 'review') or not isinstance(body, str) or not body.strip() or len(body) > 10000:
             raise ValueError('Invalid note')
         if cycle not in {c['id'] for c in self.view()['cycles']}:
@@ -455,6 +475,11 @@ class Ledger:
                 'unrealised': '仅展示账户/仓位来源快照，与已实现成交盈亏和交易净现金流分开'}
 
     def backup(self, target):
+        from .write_lock import write_lock
+        with write_lock(self.path):
+            return self._backup(target)
+
+    def _backup(self, target):
         target = private_path(target)
         if target.exists():
             raise ValueError('Backup cannot overwrite existing file')
@@ -481,6 +506,12 @@ class Ledger:
 
 
 def restore(source, target, expected_sha256):
+    from .write_lock import write_lock
+    with write_lock(private_path(target)):
+        return _restore(source, target, expected_sha256)
+
+
+def _restore(source, target, expected_sha256):
     """Validate exactly the captured bytes and atomically publish a new private DB."""
     source, target = private_path(source), private_path(target)
     if target.exists():

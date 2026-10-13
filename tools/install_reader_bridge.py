@@ -149,7 +149,7 @@ def preflight(reader, ledger, service, uid, gid, image):
     options = json.loads(run(['docker','info','--format','{{json .SecurityOptions}}']))
     if any('rootless' in x or 'userns' in x for x in options):
         raise ValueError('User mapping unsupported')
-    for rel in ('reader_bridge/app.py', 'review/__init__.py', 'review/ledger.py', 'review/readonly.py'):
+    for rel in ('reader_bridge/app.py', 'review/__init__.py', 'review/ledger.py', 'review/readonly.py','review/write_lock.py','review/verified_sync.py'):
         if not (SOURCE/rel).is_file():
             raise ValueError('Missing source')
     return reader, ledger, state, dockerfile
@@ -201,14 +201,14 @@ def install(args):
         shutil.copyfile(reader/name, backup/name)
     shutil.copyfile(SOURCE/'reader_bridge/app.py', build/'app.py')
     (build/'review').mkdir()
-    for name in ('__init__.py','ledger.py','readonly.py'):
+    for name in ('__init__.py','ledger.py','readonly.py','write_lock.py','verified_sync.py'):
         shutil.copyfile(SOURCE/'review'/name, build/'review'/name)
     # Only these code files enter the build context; no .env or account files.
     for path in (build/'app.py', *list((build/'review').iterdir())):
         path.chmod(0o644)
     (build/'review').chmod(0o755)
-    (build/'Dockerfile').write_text(dockerfile + '\nCOPY review/__init__.py review/ledger.py review/readonly.py /app/review/\n', encoding='utf-8')
-    image_digest = hashlib.sha256(b''.join((build/rel).read_bytes() for rel in ('app.py','review/__init__.py','review/ledger.py','review/readonly.py'))).hexdigest()[:16]
+    (build/'Dockerfile').write_text(dockerfile + '\nCOPY review/__init__.py review/ledger.py review/readonly.py review/write_lock.py review/verified_sync.py /app/review/\n', encoding='utf-8')
+    image_digest = hashlib.sha256(b''.join((build/rel).read_bytes() for rel in ('app.py','review/__init__.py','review/ledger.py','review/readonly.py','review/write_lock.py','review/verified_sync.py'))).hexdigest()[:16]
     override_data = json.dumps({'services': {args.service: {
         'image': 'review-reader-bridge:' + image_digest,
         'user': str(args.uid)+':'+str(args.gid),
