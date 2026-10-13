@@ -55,7 +55,10 @@ class ReadOnlyLedger(Ledger):
                 count = self.db.execute('SELECT COUNT(*) FROM (SELECT 1 FROM ' + table + ' LIMIT ?)', (maximum + 1,)).fetchone()[0]
                 if count > maximum:
                     raise ReviewError(503, 'Ledger unavailable')
-            return super().view()
+            data = super().view()
+            from .verified_sync import read_marker
+            data['last_verified_sync'] = read_marker(DATABASE, self.db)
+            return data
         finally:
             self.db.rollback()
 
@@ -102,7 +105,7 @@ def _query_review(route, params):
             return {'items': items[start:start+limit], 'total': len(items),
                     'next_offset': start+limit if start+limit < len(items) else None}
         data = {key: view[key] for key in ('as_of', 'observed_at', 'history_cutoffs', 'coverage',
-            'metrics_status', 'metrics_reasons', 'completeness', 'currency')}
+            'metrics_status', 'metrics_reasons', 'completeness', 'currency', 'last_verified_sync')}
         data['source'] = 'server SQLite ledger'
         if route == '/review-summary':
             for key in ('cash_categories', 'realised_pnl', 'period_trading_cash_net', 'deposits', 'withdrawals', 'unrealised', 'balance_bridge'):

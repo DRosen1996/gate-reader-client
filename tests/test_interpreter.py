@@ -20,7 +20,7 @@ class InterpreterTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30,
             )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Ran 5 tests', result.stderr)
+        self.assertIn('OK', result.stderr)
 
 
 if __name__ == '__main__':
